@@ -44,3 +44,23 @@ This project is built with .
 - React
 - shadcn-ui
 - Tailwind CSS
+
+## Supabase setup
+
+Use the supplied `supabase/` folder (includes config and migrations) and wire the app with environment variables.
+
+1) Install the Supabase CLI  
+   - https://supabase.com/docs/guides/cli/getting-started (Windows installer available)
+
+2) Create your environment file  
+   - Copy `env.example` to `.env.local`  
+   - Fill `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` with your project values.  
+   - If you run the local Supabase stack, you can generate these automatically with `supabase status -o env > .env.local` after `supabase start`.
+
+3) Start or connect to Supabase  
+   - Local: from the repo root run `supabase start` (uses `supabase/config.toml`).  
+   - Apply migrations locally with `supabase db reset` (recreates the database and runs everything under `supabase/migrations`).
+
+4) Run the app  
+   - `npm install`  
+   - `npm run dev` (Vite reads `.env.local` automatically).
