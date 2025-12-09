@@ -1,25 +1,28 @@
-
 import { Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
+import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
+import RespondHub from "./pages/RespondHub";
+import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
-import DamageReportsList from "./pages/DamageReportsList";
-import PreviousDetailReport from "./pages/PreviousDetailReport";
 import DetailedReport from "./pages/DetailedReport";
-import Comments from "./pages/Comments";
-import WhatIf from "./pages/WhatIf";
+import PreviousDetailReport from "./pages/PreviousDetailReport";
+import DamageReportsList from "./pages/DamageReportsList";
 
 const AppRoutes = () => {
   return (
     <Routes>
-      <Route path="/" element={<Index />} />
+      {/* Main Flow */}
+      <Route path="/" element={<Landing />} />
       <Route path="/auth" element={<Auth />} />
-      <Route path="/damage-reports-list" element={<DamageReportsList />} />
-      <Route path="/previous-detail-report" element={<PreviousDetailReport />} />
+      <Route path="/respond" element={<RespondHub />} />
+      <Route path="/admin" element={<AdminDashboard />} />
+
+      {/* Legacy Detail Pages (still functional) */}
       <Route path="/detailed-report/:id" element={<DetailedReport />} />
-      <Route path="/comments/:id" element={<Comments />} />
-      <Route path="/what-if" element={<WhatIf />} />
-      <Route path="/first-aid/:topic" element={<NotFound />} />
+      <Route path="/previous-detail-report" element={<PreviousDetailReport />} />
+      <Route path="/damage-reports-list" element={<DamageReportsList />} />
+
+      {/* Fallback */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

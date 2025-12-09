@@ -29,10 +29,14 @@ const MissingPersonForm = () => {
 
   if (!session) {
     return (
-      <div className="min-h-screen py-20 px-4 text-center">
-        <h2 className="text-2xl font-bold mb-4">Authentication Required</h2>
-        <p className="mb-4">You need to be logged in to submit a missing person report.</p>
-        <Button onClick={() => navigate('/auth')}>Sign In</Button>
+      <div className="min-h-screen bg-gradient-to-b from-white to-slate-50 py-16 px-4 text-center">
+        <div className="max-w-xl mx-auto rounded-2xl bg-white shadow-sm p-10 border border-slate-100">
+          <h2 className="text-3xl font-bold mb-3 text-slate-900">Sign in to continue</h2>
+          <p className="mb-6 text-slate-600">Log in to submit and track missing person reports. This keeps reports verified and actionable for responders.</p>
+          <Button onClick={() => navigate('/auth')} className="rounded-full px-6 py-6">
+            Go to sign in
+          </Button>
+        </div>
       </div>
     );
   }
@@ -129,13 +133,17 @@ const MissingPersonForm = () => {
   };
 
   return (
-    <section id="report-missing" className="min-h-screen py-20 px-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-12">
-          <h2 className="text-4xl font-bold text-[#ea384c]">Report Missing Person</h2>
+    <section id="report-missing" className="min-h-screen bg-gradient-to-b from-slate-50 to-white py-16 px-4">
+      <div className="max-w-5xl mx-auto space-y-10">
+        <div className="flex flex-col gap-3">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">People first</p>
+          <h2 className="text-4xl font-bold text-slate-900">Report a missing person</h2>
+          <p className="text-slate-600 max-w-3xl">
+            Capture the essentials: who is missing, where they were last seen, and how to reach you. We’ll keep the details organized for operators and responders.
+          </p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-8">
-          <div className="grid md:grid-cols-[300px,1fr] gap-8">
+          <div className="grid md:grid-cols-[320px,1fr] gap-6">
             <ImageUploadSection
               imagePreview={imagePreview}
               onImageChange={handleImageChange}
@@ -155,7 +163,7 @@ const MissingPersonForm = () => {
             />
           </div>
 
-          <div className="border-2 rounded-lg p-4 bg-white">
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-4">
             <LocationPicker
               onLocationSelected={handleLocationSelected}
               initialLat={missingPerson.latitude}
@@ -166,7 +174,7 @@ const MissingPersonForm = () => {
           <div className="flex justify-between items-center">
             <Button 
               type="submit" 
-              className="bg-[#ea384c] hover:bg-[#d42d3f] text-white px-8 py-3 rounded-lg"
+              className="bg-primary hover:bg-primary/90 text-white px-8 py-3 rounded-full"
               disabled={loading}
             >
               Submit Report
@@ -174,7 +182,7 @@ const MissingPersonForm = () => {
             <Button 
               type="button"
               onClick={() => navigate('/previous-detail-report')}
-              className="bg-white text-[#ea384c] border-2 border-[#ea384c] hover:bg-[#ea384c] hover:text-white px-8 py-3 rounded-lg"
+              className="bg-white text-primary border-2 border-primary hover:bg-primary hover:text-white px-8 py-3 rounded-full"
             >
               View All Reports
             </Button>

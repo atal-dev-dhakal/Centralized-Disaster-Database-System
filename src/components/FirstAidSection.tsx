@@ -7,21 +7,27 @@ const FirstAidSection = () => {
   };
 
   return (
-    <section id="first-aid" className="min-h-screen py-20 px-4 bg-gray-50">
-      <div className="max-w-4xl mx-auto">
-        <h2 className="text-3xl font-bold mb-8 text-center">First Aid Information</h2>
-        <div className="grid md:grid-cols-2 gap-8">
+    <section id="first-aid" className="min-h-screen bg-slate-900 text-white py-16 px-4">
+      <div className="max-w-5xl mx-auto space-y-8">
+        <div className="flex flex-col gap-2 text-center">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Stay calm, act fast</p>
+          <h2 className="text-4xl font-bold">First-aid playsbook</h2>
+          <p className="text-slate-200 max-w-3xl mx-auto">
+            Quick cues for the most common emergencies while responders are en route. Keep yourself safe first, then stabilize.
+          </p>
+        </div>
+        <div className="grid md:grid-cols-2 gap-6">
           {[
-            { title: "Head Injuries", content: "Common in earthquakes. Keep person still, check breathing, and call emergency services immediately." },
-            { title: "Fractures", content: "Immobilize the injured area, apply ice packs, and seek medical attention." },
-            { title: "Cuts & Bleeding", content: "Apply direct pressure with clean cloth, elevate the wound, and clean with antiseptic if available." },
-            { title: "Crush Injuries", content: "Call emergency services immediately. Do not attempt to free the person without professional help." }
-          ].map((info, index) => (
-            <div key={index} className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow">
-              <h3 className="text-xl font-semibold mb-4">{info.title}</h3>
-              <p className="text-gray-600 mb-4">{info.content}</p>
-              <Button variant="link" onClick={handleReadMore}>
-                Read More
+            { title: "Head injuries", content: "Keep the person still, watch breathing, do not remove helmets, and call emergency services immediately." },
+            { title: "Fractures", content: "Immobilize the area above and below the injury, avoid straightening, and apply cold packs wrapped in cloth." },
+            { title: "Bleeding", content: "Gloves on if possible. Apply firm pressure with clean cloth, elevate if safe, and do not remove soaked dressings—layer more." },
+            { title: "Crush injuries", content: "Call emergency services and do not lift heavy debris alone. Provide reassurance and monitor breathing until help arrives." }
+          ].map((info) => (
+            <div key={info.title} className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+              <h3 className="text-xl font-semibold mb-3">{info.title}</h3>
+              <p className="text-slate-200 mb-4">{info.content}</p>
+              <Button variant="secondary" onClick={handleReadMore} className="rounded-full">
+                Watch quick video
               </Button>
             </div>
           ))}

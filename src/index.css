@@ -1,59 +1,106 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
- 
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 355 83% 45%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 355 83% 45%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 355 83% 45%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 355 83% 45%;
-    --radius: 1rem;
-  }
- 
-  .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 355 83% 45%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 355 83% 45%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 355 83% 45%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
-  }
-}
 
 @layer base {
+  :root {
+    /* SajhaSahayog Theme */
+    --primary: 174 82% 24%;           /* Deep Teal #0D6A6A */
+    --primary-foreground: 0 0% 100%;  /* White */
+    --accent: 354 70% 54%;            /* Nepal Red #DC3545 */
+    --accent-foreground: 0 0% 100%;   /* White */
+    --background: 180 14% 97%;        /* Off-white #F9FAFA */
+    --foreground: 192 18% 15%;        /* Slate Dark #1F2A2E */
+    --muted: 192 10% 90%;
+    --muted-foreground: 192 12% 35%;  /* Slate Gray #324047 */
+    --card: 0 0% 100%;                /* Pure White */
+    --card-foreground: 192 18% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 192 18% 15%;
+    --secondary: 180 5% 96%;
+    --secondary-foreground: 192 18% 15%;
+    --destructive: 354 70% 54%;       /* Same as accent for alerts */
+    --destructive-foreground: 0 0% 100%;
+    --border: 180 10% 90%;
+    --input: 180 10% 90%;
+    --ring: 174 82% 24%;
+    --radius: 0.5rem;
+  }
+
   * {
     @apply border-border;
   }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-weight: 700;
+    color: hsl(var(--foreground));
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-[#0D6A6A] text-white font-semibold py-3 px-6 rounded-lg hover:bg-[#0a5555] transition-colors duration-200;
+  }
+
+  .btn-accent {
+    @apply bg-[#DC3545] text-white font-semibold py-3 px-6 rounded-lg hover:bg-[#c82333] transition-colors duration-200;
+  }
+
+  .btn-outline {
+    @apply border-2 border-[#0D6A6A] text-[#0D6A6A] font-semibold py-3 px-6 rounded-lg hover:bg-[#0D6A6A] hover:text-white transition-colors duration-200;
+  }
+
+  .card-base {
+    @apply bg-white rounded-xl shadow-sm p-6;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0D6A6A] focus:border-transparent transition-all duration-200;
+  }
+
+  .section-padding {
+    @apply py-16 px-4 sm:px-6 lg:px-8;
+  }
+
+  .container-narrow {
+    @apply max-w-2xl mx-auto;
+  }
+
+  .container-wide {
+    @apply max-w-7xl mx-auto;
+  }
+}
+
+@layer utilities {
+  .text-slate-dark {
+    color: #1F2A2E;
+  }
+
+  .text-slate-gray {
+    color: #324047;
+  }
+
+  .bg-teal-primary {
+    background-color: #0D6A6A;
+  }
+
+  .bg-red-accent {
+    background-color: #DC3545;
+  }
+
+  .border-teal {
+    border-color: #0D6A6A;
   }
 }

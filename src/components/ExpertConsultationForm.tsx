@@ -43,24 +43,31 @@ const ExpertConsultationForm = () => {
   };
 
   return (
-    <section id="expert-consultation" className="min-h-screen py-20 px-4">
-      <div className="max-w-3xl mx-auto">
-        <h2 className="text-3xl font-bold mb-8 text-center">Ask an Expert</h2>
-        <form onSubmit={handleSubmit} className="space-y-6">
+    <section id="expert-consultation" className="min-h-screen bg-gradient-to-b from-white to-slate-50 py-16 px-4">
+      <div className="max-w-4xl mx-auto space-y-8">
+        <div className="text-center space-y-2">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Expert desk</p>
+          <h2 className="text-4xl font-bold text-slate-900">Ask a medical or structural expert</h2>
+          <p className="text-slate-600 max-w-2xl mx-auto">
+            Send concise questions and how to contact you. We route answers back and keep them searchable for the team.
+          </p>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-6 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
           <Textarea
-            placeholder="Your question"
+            placeholder="What do you need help with?"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             required
+            className="min-h-[140px]"
           />
           <Input
-            placeholder="Your contact information"
+            placeholder="How should we reach you? (phone, radio call sign, or email)"
             value={contactInfo}
             onChange={(e) => setContactInfo(e.target.value)}
             required
           />
-          <Button type="submit" className="w-full" disabled={loading}>
-            Submit Question
+          <Button type="submit" className="w-full rounded-full py-6" disabled={loading}>
+            Submit question
           </Button>
         </form>
       </div>

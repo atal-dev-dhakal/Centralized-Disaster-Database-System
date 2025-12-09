@@ -28,10 +28,14 @@ const DamageReportForm = () => {
 
   if (!session) {
     return (
-      <div className="min-h-screen py-20 px-4 text-center">
-        <h2 className="text-2xl font-bold mb-4">Authentication Required</h2>
-        <p className="mb-4">You need to be logged in to submit a damage report.</p>
-        <Button onClick={() => navigate('/auth')}>Sign In</Button>
+      <div className="min-h-screen bg-gradient-to-b from-white to-slate-50 py-16 px-4 text-center">
+        <div className="max-w-xl mx-auto rounded-2xl bg-white shadow-sm p-10 border border-slate-100">
+          <h2 className="text-3xl font-bold mb-3 text-slate-900">Sign in to continue</h2>
+          <p className="mb-6 text-slate-600">Log in to submit damage assessments and keep responders aligned.</p>
+          <Button onClick={() => navigate('/auth')} className="rounded-full px-6 py-6">
+            Go to sign in
+          </Button>
+        </div>
       </div>
     );
   }
@@ -106,13 +110,19 @@ const DamageReportForm = () => {
   };
 
   return (
-    <section id="damage-report" className="min-h-screen py-12 px-4">
-      <div className="max-w-3xl mx-auto">
-        <h2 className="text-4xl font-bold mb-8 text-center text-[#ea384c]">Report Damage</h2>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-6">
+    <section id="damage-report" className="min-h-screen bg-gradient-to-b from-white to-slate-50 py-16 px-4">
+      <div className="max-w-5xl mx-auto space-y-10">
+        <div className="flex flex-col gap-3 text-center">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Infrastructure & impact</p>
+          <h2 className="text-4xl font-bold text-slate-900">Report damage or hazards</h2>
+          <p className="text-slate-600 max-w-3xl mx-auto">
+            Log affected locations with photos, describe the situation, and flag suspected casualties. Every report helps prioritize routes and resources.
+          </p>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-6">
             {/* Image Upload Section */}
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 flex flex-col items-center justify-center space-y-4 bg-white relative min-h-[300px]">
+            <div className="border border-dashed border-slate-300 rounded-2xl p-8 flex flex-col items-center justify-center space-y-4 bg-white relative min-h-[320px]">
               {damageReport.image ? (
                 <div className="w-full h-full relative">
                   <img 
@@ -123,7 +133,7 @@ const DamageReportForm = () => {
                   <Button
                     type="button"
                     onClick={() => setDamageReport({ ...damageReport, image: null })}
-                    className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full"
+                    className="absolute top-2 right-2 bg-destructive hover:bg-destructive/90 text-white p-2 rounded-full"
                   >
                     ×
                   </Button>
@@ -136,8 +146,8 @@ const DamageReportForm = () => {
                     onChange={(e) => setDamageReport({ ...damageReport, image: e.target.files?.[0] || null })}
                     className="hidden"
                   />
-                  <Plus className="w-12 h-12 text-[#ea384c] mx-auto mb-2" />
-                  <span className="text-gray-600">Add Photo</span>
+                  <Plus className="w-12 h-12 text-primary mx-auto mb-2" />
+                  <span className="text-slate-600">Add photo</span>
                 </label>
               )}
             </div>
@@ -149,28 +159,28 @@ const DamageReportForm = () => {
                 value={damageReport.location}
                 onChange={(e) => setDamageReport({ ...damageReport, location: e.target.value })}
                 required
-                className="border-2 border-gray-200 rounded-lg h-12"
+                className="border-2 border-slate-200 rounded-xl h-12"
               />
               <Textarea
                 placeholder="Describe The Damage"
                 value={damageReport.description}
                 onChange={(e) => setDamageReport({ ...damageReport, description: e.target.value })}
                 required
-                className="border-2 border-gray-200 rounded-lg min-h-[120px] resize-none"
+                className="border-2 border-slate-200 rounded-xl min-h-[120px] resize-none"
               />
               <div className="space-y-2">
-                <p className="text-lg">Do You Suspect Human Casualties?</p>
+                <p className="text-lg font-medium text-slate-800">Do you suspect human casualties?</p>
                 <RadioGroup
                   value={damageReport.hasCasualties}
                   onValueChange={(value) => setDamageReport({ ...damageReport, hasCasualties: value })}
                   className="flex items-center gap-8"
                 >
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="yes" id="yes" className="border-2 border-[#ea384c]" />
+                    <RadioGroupItem value="yes" id="yes" className="border-2 border-primary" />
                     <Label htmlFor="yes" className="text-lg">YES</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="no" id="no" className="border-2 border-[#ea384c]" />
+                    <RadioGroupItem value="no" id="no" className="border-2 border-primary" />
                     <Label htmlFor="no" className="text-lg">NO</Label>
                   </div>
                 </RadioGroup>
@@ -179,7 +189,7 @@ const DamageReportForm = () => {
           </div>
 
           {/* Map Section */}
-          <div className="border-2 border-gray-200 rounded-lg p-4">
+          <div className="border-2 border-slate-200 rounded-2xl p-4 bg-white shadow-sm">
             <LocationPicker
               onLocationSelected={handleLocationSelected}
               initialLat={damageReport.latitude}
@@ -191,7 +201,7 @@ const DamageReportForm = () => {
           <div className="flex justify-center gap-4">
             <Button 
               type="submit" 
-              className="bg-[#ea384c] hover:bg-[#d62e3f] text-white px-8"
+              className="bg-primary hover:bg-primary/90 text-white px-8 rounded-full"
               disabled={loading}
             >
               Submit Report
@@ -199,7 +209,7 @@ const DamageReportForm = () => {
             <Button 
               type="button"
               variant="outline" 
-              className="border-2 border-[#ea384c] text-[#ea384c] hover:bg-[#ea384c] hover:text-white px-8"
+              className="border-2 border-primary text-primary hover:bg-primary hover:text-white px-8 rounded-full"
               onClick={() => navigate('/damage-reports-list')}
             >
               View All Reports
