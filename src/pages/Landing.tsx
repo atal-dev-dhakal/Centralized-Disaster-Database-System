@@ -2,10 +2,25 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import Layout from "@/components/layout/Layout";
 import { useLanguage } from "@/contexts/LanguageContext";
+import TypewriterText from "@/components/TypewriterText";
 import { MapPin, Shield, Users } from "lucide-react";
 
 const Landing = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+
+  const heroPhrasesEN = [
+    "Disaster Response",
+    "Centralized Platform", 
+    "Simplified Operation",
+  ];
+
+  const heroPhrasesNP = [
+    "आपदा प्रतिक्रिया",
+    "केन्द्रीकृत प्लेटफर्म",
+    "सरलीकृत सञ्चालन",
+  ];
+
+  const heroPhrases = language === "np" ? heroPhrasesNP : heroPhrasesEN;
 
   return (
     <Layout>
@@ -16,9 +31,14 @@ const Landing = () => {
         
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24 lg:py-32">
           <div className="max-w-3xl mx-auto text-center">
-            {/* Main Headline */}
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-slate-dark leading-tight mb-4 sm:mb-6">
-              {t("heroTitle")}
+            {/* Main Headline with Typewriter Effect */}
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-slate-dark leading-tight mb-4 sm:mb-6 min-h-[1.2em]">
+              <TypewriterText
+                phrases={heroPhrases}
+                typingSpeed={80}
+                deletingSpeed={40}
+                pauseDuration={2000}
+              />
             </h1>
             
             {/* Subheadline */}
