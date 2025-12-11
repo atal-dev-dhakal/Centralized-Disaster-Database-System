@@ -34,7 +34,7 @@ const LocationPicker = ({
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    mapboxgl.accessToken = 'pk.eyJ1IjoiYW53ZXNoMTMiLCJhIjoiY202dGhsMGExMDNmMjJscjN1dGdpYTB0cyJ9.UhrIpur7WpvGR5NmJDfbpQ';
+    mapboxgl.accessToken = 'pk.eyJ1IjoiYXRhbGRldmRoYWthbCIsImEiOiJjbWoxOWlsdDEwZmZxM2pxd2wxa3RqeGFsIn0.qHTeupEeSF4X_oCOydUScQ';
     
     const nepalBounds: [number, number, number, number] = [
       80.0884, // west

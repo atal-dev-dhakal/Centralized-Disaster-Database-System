@@ -98,6 +98,37 @@ export const translations: Translations = {
   gallery: { en: "Gallery", np: "ग्यालेरी" },
   noPhotosYet: { en: "No photos uploaded yet.", np: "अझै कुनै फोटो अपलोड गरिएको छैन।" },
 
+  // Dispatch Module
+  dispatch: { en: "Dispatch", np: "पठाउनुहोस्" },
+  dispatchTeam: { en: "Dispatch Team", np: "टोली पठाउनुहोस्" },
+  assignTeam: { en: "Assign Team", np: "टोली तोक्नुहोस्" },
+  selectTeam: { en: "Select a team to dispatch", np: "पठाउने टोली छान्नुहोस्" },
+  teamPolice: { en: "Nepal Police", np: "नेपाल प्रहरी" },
+  teamArmy: { en: "Nepal Army", np: "नेपाली सेना" },
+  teamRedCross: { en: "Red Cross Nepal", np: "रेड क्रस नेपाल" },
+  teamFireBrigade: { en: "Fire Brigade", np: "दमकल" },
+  teamMedical: { en: "Medical Team", np: "चिकित्सा टोली" },
+  teamRescue: { en: "Search & Rescue", np: "खोज तथा उद्धार" },
+  teamExcavator: { en: "Heavy Equipment", np: "भारी उपकरण" },
+  teamVolunteers: { en: "Volunteers", np: "स्वयंसेवकहरू" },
+  addNote: { en: "Add Note (Optional)", np: "नोट थप्नुहोस् (ऐच्छिक)" },
+  notePlaceholder: { en: "Any special instructions...", np: "कुनै विशेष निर्देशनहरू..." },
+  confirmDispatch: { en: "Confirm Dispatch", np: "पठाउने पुष्टि गर्नुहोस्" },
+  cancel: { en: "Cancel", np: "रद्द गर्नुहोस्" },
+  dispatched: { en: "Dispatched", np: "पठाइयो" },
+  inProgress: { en: "In Progress", np: "कार्यमा" },
+  resolved: { en: "Resolved", np: "समाधान भयो" },
+  pending: { en: "Pending", np: "पर्खिरहेको" },
+  markResolved: { en: "Mark Resolved", np: "समाधान चिन्ह लगाउनुहोस्" },
+  dispatchedTo: { en: "Dispatched to", np: "पठाइएको" },
+  dispatchedReports: { en: "Dispatched", np: "पठाइएको" },
+  statusPending: { en: "Pending", np: "पर्खिरहेको" },
+  statusDispatched: { en: "Team Dispatched", np: "टोली पठाइयो" },
+  statusInProgress: { en: "Work in Progress", np: "काम भइरहेको छ" },
+  statusResolved: { en: "Resolved", np: "समाधान भयो" },
+  dispatchSuccess: { en: "Team dispatched successfully", np: "टोली सफलतापूर्वक पठाइयो" },
+  resolveSuccess: { en: "Report marked as resolved", np: "रिपोर्ट समाधान भएको चिन्ह लगाइयो" },
+
   // Footer
   copyright: { en: "© 2025 SajhaSahayog. Built for Nepal.", np: "© २०२५ सझासहयोग। नेपालको लागि बनाइएको।" },
   privacy: { en: "Privacy", np: "गोपनीयता" },
@@ -136,4 +167,3 @@ export const useLanguage = () => {
   }
   return context;
 };
-

@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import { useLanguage } from "@/contexts/LanguageContext";
 import Layout from "@/components/layout/Layout";
+import DispatchModal from "@/components/DispatchModal";
 import {
   AlertTriangle,
   CheckCircle,
@@ -16,11 +17,15 @@ import {
   Image as ImageIcon,
   Download,
   X,
+  Truck,
+  Play,
 } from "lucide-react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 
-mapboxgl.accessToken = "pk.eyJ1IjoibG92YWJsZSIsImEiOiJjbHNxZ2JnenUwMXBoMmtvNnJqZjZ4MG85In0.r4XJMi1Hmf2ADT8LBBiSPQ";
+mapboxgl.accessToken = "pk.eyJ1IjoiYXRhbGRldmRoYWthbCIsImEiOiJjbWoxOWlsdDEwZmZxM2pxd2wxa3RqeGFsIn0.qHTeupEeSF4X_oCOydUScQ";
+
+type ReportStatus = "pending" | "dispatched" | "in_progress" | "resolved";
 
 interface Report {
   id: string;
@@ -33,9 +38,27 @@ interface Report {
   verified: boolean;
   critical: boolean;
   imageUrl?: string | null;
+  status: ReportStatus;
+  dispatchedTeam?: string | null;
+  dispatchNote?: string | null;
 }
 
 type AdminTab = "map" | "feed" | "gallery";
+
+// Team name mapping for display
+const getTeamDisplayName = (teamId: string, t: (key: string) => string): string => {
+  const teamKeyMap: { [key: string]: string } = {
+    police: "teamPolice",
+    army: "teamArmy",
+    redCross: "teamRedCross",
+    fireBrigade: "teamFireBrigade",
+    medical: "teamMedical",
+    rescue: "teamRescue",
+    excavator: "teamExcavator",
+    volunteers: "teamVolunteers",
+  };
+  return t(teamKeyMap[teamId] || teamId);
+};
 
 const AdminDashboard = () => {
   const { session, isLoading: authLoading } = useAuth();
@@ -47,17 +70,21 @@ const AdminDashboard = () => {
   const markersRef = useRef<mapboxgl.Marker[]>([]);
 
   const [activeTab, setActiveTab] = useState<AdminTab>("feed");
-  const [showGalleryModal, setShowGalleryModal] = useState(false);
   const [stats, setStats] = useState({
     activeReports: 0,
     criticalHazards: 0,
     verifiedCount: 0,
+    dispatchedCount: 0,
   });
   const [reports, setReports] = useState<Report[]>([]);
   const [photos, setPhotos] = useState<{ url: string; title: string; location: string; time: string }[]>([]);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [mapReady, setMapReady] = useState(false);
+  
+  // Dispatch modal state
+  const [dispatchModalOpen, setDispatchModalOpen] = useState(false);
+  const [selectedReportForDispatch, setSelectedReportForDispatch] = useState<Report | null>(null);
 
   useEffect(() => {
     if (!authLoading && !session) {
@@ -116,13 +143,21 @@ const AdminDashboard = () => {
   // Resize map when tab changes to map
   useEffect(() => {
     if (activeTab === "map" && map.current) {
+      // Small delay to ensure visibility is applied first
       setTimeout(() => {
         map.current?.resize();
-      }, 100);
+      }, 50);
     }
   }, [activeTab]);
 
-  // Update markers when reports change
+  // Re-initialize map if it failed initially
+  useEffect(() => {
+    if (activeTab === "map" && !map.current && mapContainer.current) {
+      initMap();
+    }
+  }, [activeTab, initMap]);
+
+  // Update markers when reports change - with dispatch status colors
   useEffect(() => {
     if (!map.current || !mapReady) return;
 
@@ -141,12 +176,19 @@ const AdminDashboard = () => {
         box-shadow: 0 2px 6px rgba(0,0,0,0.3);
       `;
 
-      if (report.verified) {
-        el.style.backgroundColor = "#22c55e";
+      // Color based on status
+      if (report.status === "resolved") {
+        el.style.backgroundColor = "#22c55e"; // Green - resolved
+      } else if (report.status === "in_progress") {
+        el.style.backgroundColor = "#3b82f6"; // Blue - in progress
+      } else if (report.status === "dispatched") {
+        el.style.backgroundColor = "#8b5cf6"; // Purple - dispatched
       } else if (report.type === "missing") {
-        el.style.backgroundColor = "#eab308";
+        el.style.backgroundColor = "#eab308"; // Yellow - missing person
+      } else if (report.critical) {
+        el.style.backgroundColor = "#DC3545"; // Red - critical
       } else {
-        el.style.backgroundColor = "#DC3545";
+        el.style.backgroundColor = "#f97316"; // Orange - pending damage
       }
 
       const marker = new mapboxgl.Marker(el)
@@ -182,31 +224,57 @@ const AdminDashboard = () => {
       console.log("Missing data:", missingData);
       console.log("Damage data:", damageData);
 
-      const missingReports: Report[] = (missingData || []).map((r) => ({
-        id: r.id,
-        type: "missing" as const,
-        title: r.name,
-        description: r.last_seen_location,
-        time: r.created_at,
-        latitude: r.latitude || 27.7172,
-        longitude: r.longitude || 85.324,
-        verified: r.status === "found",
-        critical: false,
-        imageUrl: r.image_url,
-      }));
+      const missingReports: Report[] = (missingData || []).map((r) => {
+        // Determine status based on existing fields
+        let status: ReportStatus = "pending";
+        if (r.status === "found") {
+          status = "resolved";
+        } else if ((r as any).dispatch_status) {
+          status = (r as any).dispatch_status as ReportStatus;
+        }
+        
+        return {
+          id: r.id,
+          type: "missing" as const,
+          title: r.name,
+          description: r.last_seen_location,
+          time: r.created_at,
+          latitude: r.latitude || 27.7172,
+          longitude: r.longitude || 85.324,
+          verified: r.status === "found",
+          critical: false,
+          imageUrl: r.image_url,
+          status,
+          dispatchedTeam: (r as any).dispatched_team || null,
+          dispatchNote: (r as any).dispatch_note || null,
+        };
+      });
 
-      const damageReports: Report[] = (damageData || []).map((r) => ({
-        id: r.id,
-        type: "damage" as const,
-        title: r.location,
-        description: r.description,
-        time: r.created_at,
-        latitude: r.latitude || 27.7172,
-        longitude: r.longitude || 85.324,
-        verified: r.verified || false,
-        critical: r.has_casualties || false,
-        imageUrl: r.image_url,
-      }));
+      const damageReports: Report[] = (damageData || []).map((r) => {
+        // Determine status based on existing fields
+        let status: ReportStatus = "pending";
+        if (r.verified) {
+          status = "resolved";
+        } else if ((r as any).dispatch_status) {
+          status = (r as any).dispatch_status as ReportStatus;
+        }
+        
+        return {
+          id: r.id,
+          type: "damage" as const,
+          title: r.location,
+          description: r.description,
+          time: r.created_at,
+          latitude: r.latitude || 27.7172,
+          longitude: r.longitude || 85.324,
+          verified: r.verified || false,
+          critical: r.has_casualties || false,
+          imageUrl: r.image_url,
+          status,
+          dispatchedTeam: (r as any).dispatched_team || null,
+          dispatchNote: (r as any).dispatch_note || null,
+        };
+      });
 
       const allReports = [...missingReports, ...damageReports].sort(
         (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()
@@ -227,38 +295,121 @@ const AdminDashboard = () => {
       console.log("Photos found:", allPhotos);
       setPhotos(allPhotos);
 
-      const active = allReports.filter((r) => !r.verified).length;
-      const critical = damageReports.filter((r) => r.critical && !r.verified).length;
-      const verified = allReports.filter((r) => r.verified).length;
+      const pending = allReports.filter((r) => r.status === "pending").length;
+      const critical = damageReports.filter((r) => r.critical && r.status !== "resolved").length;
+      const resolved = allReports.filter((r) => r.status === "resolved").length;
+      const dispatched = allReports.filter((r) => r.status === "dispatched" || r.status === "in_progress").length;
 
       setStats({
-        activeReports: active,
+        activeReports: pending,
         criticalHazards: critical,
-        verifiedCount: verified,
+        verifiedCount: resolved,
+        dispatchedCount: dispatched,
       });
     } catch (error) {
       console.error("Error fetching reports:", error);
     }
   };
 
-  const handleVerify = async (report: Report) => {
+  const handleDispatchClick = (report: Report) => {
+    setSelectedReportForDispatch(report);
+    setDispatchModalOpen(true);
+  };
+
+  const handleDispatch = async (team: string, note: string) => {
+    if (!selectedReportForDispatch) return;
+
+    try {
+      const updateData = {
+        dispatch_status: "dispatched",
+        dispatched_team: team,
+        dispatch_note: note || null,
+      };
+
+      if (selectedReportForDispatch.type === "missing") {
+        await supabase
+          .from("missing_persons")
+          .update(updateData)
+          .eq("id", selectedReportForDispatch.id);
+      } else {
+        await supabase
+          .from("damage_reports")
+          .update(updateData)
+          .eq("id", selectedReportForDispatch.id);
+      }
+
+      toast({ 
+        title: t("dispatchSuccess"), 
+        description: `${getTeamDisplayName(team, t)} ${t("dispatched").toLowerCase()}` 
+      });
+      
+      // Update local state immediately
+      setReports(prev => prev.map(r => 
+        r.id === selectedReportForDispatch.id 
+          ? { ...r, status: "dispatched" as ReportStatus, dispatchedTeam: team, dispatchNote: note }
+          : r
+      ));
+      
+      // Also update stats
+      setStats(prev => ({
+        ...prev,
+        activeReports: prev.activeReports - 1,
+        dispatchedCount: prev.dispatchedCount + 1,
+      }));
+
+    } catch (error: any) {
+      toast({ title: t("error"), description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleMarkInProgress = async (report: Report) => {
+    try {
+      const table = report.type === "missing" ? "missing_persons" : "damage_reports";
+      await supabase
+        .from(table)
+        .update({ dispatch_status: "in_progress" })
+        .eq("id", report.id);
+
+      // Update local state
+      setReports(prev => prev.map(r => 
+        r.id === report.id ? { ...r, status: "in_progress" as ReportStatus } : r
+      ));
+
+      toast({ title: t("statusInProgress") });
+    } catch (error: any) {
+      toast({ title: t("error"), description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleMarkResolved = async (report: Report) => {
     try {
       if (report.type === "missing") {
         await supabase
           .from("missing_persons")
-          .update({ status: "found" })
+          .update({ status: "found", dispatch_status: "resolved" })
           .eq("id", report.id);
       } else {
         await supabase
           .from("damage_reports")
-          .update({ verified: true })
+          .update({ verified: true, dispatch_status: "resolved" })
           .eq("id", report.id);
       }
 
-      toast({ title: "Report verified", description: "Status updated successfully." });
-      fetchAllReports();
+      toast({ title: t("resolveSuccess") });
+      
+      // Update local state
+      setReports(prev => prev.map(r => 
+        r.id === report.id ? { ...r, status: "resolved" as ReportStatus, verified: true } : r
+      ));
+      
+      setStats(prev => ({
+        ...prev,
+        dispatchedCount: prev.dispatchedCount - 1,
+        verifiedCount: prev.verifiedCount + 1,
+      }));
+
     } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: t("error"), description: error.message, variant: "destructive" });
     }
   };
 
@@ -273,10 +424,46 @@ const AdminDashboard = () => {
     return date.toLocaleDateString();
   };
 
+  const getStatusBadge = (report: Report) => {
+    switch (report.status) {
+      case "dispatched":
+        return (
+          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded font-medium flex items-center gap-1">
+            <Truck className="w-3 h-3" />
+            {t("statusDispatched")}
+          </span>
+        );
+      case "in_progress":
+        return (
+          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-medium flex items-center gap-1">
+            <Play className="w-3 h-3" />
+            {t("statusInProgress")}
+          </span>
+        );
+      case "resolved":
+        return (
+          <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium flex items-center gap-1">
+            <CheckCircle className="w-3 h-3" />
+            {t("statusResolved")}
+          </span>
+        );
+      default:
+        return report.critical ? (
+          <span className="text-xs bg-red-100 text-[#DC3545] px-2 py-1 rounded font-medium">
+            {t("critical")}
+          </span>
+        ) : (
+          <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded font-medium">
+            {t("statusPending")}
+          </span>
+        );
+    }
+  };
+
   const exportToCSV = () => {
     setIsExporting(true);
     try {
-      const headers = ["Type", "Title", "Description", "Date", "Latitude", "Longitude", "Verified", "Critical"];
+      const headers = ["Type", "Title", "Description", "Date", "Latitude", "Longitude", "Status", "Dispatched Team", "Critical"];
       const rows = reports.map((r) => [
         r.type,
         r.title,
@@ -284,7 +471,8 @@ const AdminDashboard = () => {
         new Date(r.time).toISOString(),
         r.latitude,
         r.longitude,
-        r.verified ? "Yes" : "No",
+        r.status,
+        r.dispatchedTeam ? getTeamDisplayName(r.dispatchedTeam, t) : "",
         r.critical ? "Yes" : "No",
       ]);
 
@@ -320,13 +508,15 @@ const AdminDashboard = () => {
             th { background-color: #0D6A6A; color: white; }
             tr:nth-child(even) { background-color: #f9f9f9; }
             .critical { color: #DC3545; font-weight: bold; }
-            .verified { color: #22c55e; }
+            .dispatched { color: #7c3aed; }
+            .in-progress { color: #3b82f6; }
+            .resolved { color: #22c55e; }
           </style>
         </head>
         <body>
           <h1>SajhaSahayog Incident Reports</h1>
           <p>Generated: ${new Date().toLocaleString()}</p>
-          <p>Total Reports: ${reports.length} | Active: ${stats.activeReports} | Critical: ${stats.criticalHazards} | Verified: ${stats.verifiedCount}</p>
+          <p>Total: ${reports.length} | Pending: ${stats.activeReports} | Dispatched: ${stats.dispatchedCount} | Resolved: ${stats.verifiedCount}</p>
           <table>
             <thead>
               <tr>
@@ -335,6 +525,7 @@ const AdminDashboard = () => {
                 <th>Description</th>
                 <th>Date</th>
                 <th>Status</th>
+                <th>Team</th>
               </tr>
             </thead>
             <tbody>
@@ -346,9 +537,11 @@ const AdminDashboard = () => {
                   <td>${r.title}</td>
                   <td>${r.description || "-"}</td>
                   <td>${new Date(r.time).toLocaleDateString()}</td>
-                  <td class="${r.critical ? "critical" : ""} ${r.verified ? "verified" : ""}">
-                    ${r.critical ? "CRITICAL" : ""} ${r.verified ? "Verified" : "Pending"}
+                  <td class="${r.status === 'dispatched' ? 'dispatched' : r.status === 'in_progress' ? 'in-progress' : r.status === 'resolved' ? 'resolved' : ''} ${r.critical ? 'critical' : ''}">
+                    ${r.status.charAt(0).toUpperCase() + r.status.slice(1).replace('_', ' ')}
+                    ${r.critical && r.status === 'pending' ? ' (CRITICAL)' : ''}
                   </td>
+                  <td>${r.dispatchedTeam ? getTeamDisplayName(r.dispatchedTeam, t) : '-'}</td>
                 </tr>
               `
                 )
@@ -415,43 +608,55 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* Stats Row */}
+      {/* Stats Row - now with 4 stats */}
       <div className="bg-white border-b border-gray-200 py-3 sm:py-4 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-3 gap-3 sm:gap-4">
+          <div className="grid grid-cols-4 gap-2 sm:gap-4">
             <div className="flex items-center gap-2 sm:gap-3">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-yellow-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600" />
+              <div className="w-9 h-9 sm:w-12 sm:h-12 bg-yellow-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-yellow-600" />
               </div>
               <div className="min-w-0">
-                <p className="text-xl sm:text-2xl font-bold text-slate-dark">
+                <p className="text-lg sm:text-2xl font-bold text-slate-dark">
                   {stats.activeReports}
                 </p>
-                <p className="text-xs sm:text-sm text-slate-gray truncate">{t("activeReports")}</p>
+                <p className="text-[10px] sm:text-sm text-slate-gray truncate">{t("pending")}</p>
               </div>
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-[#DC3545]" />
+              <div className="w-9 h-9 sm:w-12 sm:h-12 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Truck className="w-4 h-4 sm:w-6 sm:h-6 text-purple-600" />
               </div>
               <div className="min-w-0">
-                <p className="text-xl sm:text-2xl font-bold text-[#DC3545]">
+                <p className="text-lg sm:text-2xl font-bold text-purple-600">
+                  {stats.dispatchedCount}
+                </p>
+                <p className="text-[10px] sm:text-sm text-slate-gray truncate">{t("dispatched")}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-9 h-9 sm:w-12 sm:h-12 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-4 h-4 sm:w-6 sm:h-6 text-[#DC3545]" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-lg sm:text-2xl font-bold text-[#DC3545]">
                   {stats.criticalHazards}
                 </p>
-                <p className="text-xs sm:text-sm text-slate-gray truncate">{t("criticalHazards")}</p>
+                <p className="text-[10px] sm:text-sm text-slate-gray truncate">{t("critical")}</p>
               </div>
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
+              <div className="w-9 h-9 sm:w-12 sm:h-12 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <CheckCircle className="w-4 h-4 sm:w-6 sm:h-6 text-green-600" />
               </div>
               <div className="min-w-0">
-                <p className="text-xl sm:text-2xl font-bold text-green-600">
+                <p className="text-lg sm:text-2xl font-bold text-green-600">
                   {stats.verifiedCount}
                 </p>
-                <p className="text-xs sm:text-sm text-slate-gray truncate">{t("verifiedResolved")}</p>
+                <p className="text-[10px] sm:text-sm text-slate-gray truncate">{t("resolved")}</p>
               </div>
             </div>
           </div>
@@ -498,10 +703,53 @@ const AdminDashboard = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden" style={{ height: "calc(100vh - 240px)" }}>
+      <div className="flex-1 overflow-hidden relative" style={{ height: "calc(100vh - 280px)" }}>
+        {/* Map Tab - Always rendered but hidden when not active */}
+        <div className={`absolute inset-0 ${activeTab === "map" ? "z-10" : "z-0 invisible"}`}>
+          <div ref={mapContainer} className="w-full h-full" />
+
+          {/* Map Legend - Updated with dispatch colors */}
+          {activeTab === "map" && (
+            <>
+              <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg p-3 text-sm z-10">
+                <p className="font-semibold text-slate-dark mb-2">{t("legend")}</p>
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-[#DC3545]" />
+                    <span className="text-slate-gray text-xs">{t("critical")}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-yellow-500" />
+                    <span className="text-slate-gray text-xs">{t("missingPerson")}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-purple-500" />
+                    <span className="text-slate-gray text-xs">{t("dispatched")}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-blue-500" />
+                    <span className="text-slate-gray text-xs">{t("inProgress")}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-green-500" />
+                    <span className="text-slate-gray text-xs">{t("resolved")}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Report count */}
+              <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg px-3 py-2 z-10">
+                <p className="text-sm font-medium text-slate-dark">
+                  {reports.length} reports on map
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+
         {/* Feed Tab */}
         {activeTab === "feed" && (
-          <div className="h-full overflow-y-auto bg-[#F9FAFA]">
+          <div className="h-full overflow-y-auto bg-[#F9FAFA] relative z-20">
             <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4">
               {reports.length === 0 ? (
                 <div className="text-center py-12">
@@ -513,8 +761,12 @@ const AdminDashboard = () => {
                   <div
                     key={report.id}
                     className={`bg-white rounded-lg shadow-sm p-4 sm:p-5 border-l-4 ${
-                      report.verified
+                      report.status === "resolved"
                         ? "border-l-green-500"
+                        : report.status === "in_progress"
+                        ? "border-l-blue-500"
+                        : report.status === "dispatched"
+                        ? "border-l-purple-500"
                         : report.critical
                         ? "border-l-red-500"
                         : report.type === "missing"
@@ -525,7 +777,7 @@ const AdminDashboard = () => {
                     <div className="flex items-start justify-between mb-2">
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-slate-dark text-base truncate">
-                          {report.type === "missing" ? "Missing: " : "Hazard: "}
+                          {report.type === "missing" ? `${t("missingPerson")}: ` : ""}
                           {report.title}
                         </p>
                         <p className="text-xs text-slate-gray mt-1">
@@ -541,11 +793,7 @@ const AdminDashboard = () => {
                             <img src={report.imageUrl} alt="" className="w-full h-full object-cover" />
                           </button>
                         )}
-                        {report.critical && !report.verified && (
-                          <span className="text-xs bg-red-100 text-[#DC3545] px-2 py-1 rounded font-medium flex-shrink-0">
-                            {t("critical")}
-                          </span>
-                        )}
+                        {getStatusBadge(report)}
                       </div>
                     </div>
 
@@ -555,16 +803,86 @@ const AdminDashboard = () => {
                       </p>
                     )}
 
-                    {!report.verified && (
-                      <div className="flex flex-wrap gap-2">
+                    {/* Show dispatched team info */}
+                    {report.dispatchedTeam && report.status !== "resolved" && (
+                      <div className="bg-purple-50 rounded-lg p-2 mb-3 text-sm">
+                        <span className="text-purple-700 font-medium">
+                          {t("dispatchedTo")}: {getTeamDisplayName(report.dispatchedTeam, t)}
+                        </span>
+                        {report.dispatchNote && (
+                          <p className="text-purple-600 text-xs mt-1">{report.dispatchNote}</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Action buttons based on status */}
+                    <div className="flex flex-wrap gap-2">
+                      {report.status === "pending" && (
+                        <>
+                          <Button
+                            size="sm"
+                            onClick={() => handleDispatchClick(report)}
+                            className="bg-[#0D6A6A] hover:bg-[#0a5555] text-white text-xs"
+                          >
+                            <Truck className="w-3 h-3 mr-1" />
+                            {t("dispatch")}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setActiveTab("map");
+                              setTimeout(() => {
+                                if (map.current) {
+                                  map.current.flyTo({
+                                    center: [report.longitude, report.latitude],
+                                    zoom: 14,
+                                  });
+                                }
+                              }, 200);
+                            }}
+                            className="text-xs"
+                          >
+                            <Eye className="w-3 h-3 mr-1" />
+                            {t("viewOnMap")}
+                          </Button>
+                        </>
+                      )}
+
+                      {report.status === "dispatched" && (
+                        <>
+                          <Button
+                            size="sm"
+                            onClick={() => handleMarkInProgress(report)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white text-xs"
+                          >
+                            <Play className="w-3 h-3 mr-1" />
+                            {t("inProgress")}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleMarkResolved(report)}
+                            className="text-xs text-green-600 border-green-600 hover:bg-green-50"
+                          >
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            {t("markResolved")}
+                          </Button>
+                        </>
+                      )}
+
+                      {report.status === "in_progress" && (
                         <Button
                           size="sm"
-                          onClick={() => handleVerify(report)}
-                          className="bg-[#0D6A6A] hover:bg-[#0a5555] text-white text-xs"
+                          onClick={() => handleMarkResolved(report)}
+                          className="bg-green-600 hover:bg-green-700 text-white text-xs"
                         >
                           <CheckCircle className="w-3 h-3 mr-1" />
-                          {t("verify")}
+                          {t("markResolved")}
                         </Button>
+                      )}
+
+                      {report.status !== "pending" && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -584,15 +902,8 @@ const AdminDashboard = () => {
                           <Eye className="w-3 h-3 mr-1" />
                           {t("viewOnMap")}
                         </Button>
-                      </div>
-                    )}
-
-                    {report.verified && (
-                      <span className="text-xs text-green-600 font-medium flex items-center gap-1">
-                        <CheckCircle className="w-3 h-3" />
-                        {t("verified")}
-                      </span>
-                    )}
+                      )}
+                    </div>
                   </div>
                 ))
               )}
@@ -600,42 +911,9 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* Map Tab */}
-        {activeTab === "map" && (
-          <div className="h-full relative">
-            <div ref={mapContainer} className="absolute inset-0" />
-
-            {/* Map Legend */}
-            <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg p-3 text-sm z-10">
-              <p className="font-semibold text-slate-dark mb-2">{t("legend")}</p>
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-[#DC3545]" />
-                  <span className="text-slate-gray text-xs">{t("damageUnverified")}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-yellow-500" />
-                  <span className="text-slate-gray text-xs">{t("missingPerson")}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-green-500" />
-                  <span className="text-slate-gray text-xs">{t("verifiedResolved")}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Report count */}
-            <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg px-3 py-2 z-10">
-              <p className="text-sm font-medium text-slate-dark">
-                {reports.length} reports on map
-              </p>
-            </div>
-          </div>
-        )}
-
         {/* Gallery Tab */}
         {activeTab === "gallery" && (
-          <div className="h-full overflow-y-auto bg-[#F9FAFA]">
+          <div className="h-full overflow-y-auto bg-[#F9FAFA] relative z-20">
             <div className="max-w-6xl mx-auto p-4 sm:p-6">
               {photos.length === 0 ? (
                 <div className="text-center py-12">
@@ -715,6 +993,17 @@ const AdminDashboard = () => {
           </div>
         </div>
       )}
+
+      {/* Dispatch Modal */}
+      <DispatchModal
+        isOpen={dispatchModalOpen}
+        onClose={() => {
+          setDispatchModalOpen(false);
+          setSelectedReportForDispatch(null);
+        }}
+        onDispatch={handleDispatch}
+        reportTitle={selectedReportForDispatch?.title || ""}
+      />
     </Layout>
   );
 };
