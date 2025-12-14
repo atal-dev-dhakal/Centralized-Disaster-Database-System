@@ -7,6 +7,8 @@ import { useAuth } from "@/components/AuthProvider";
 import { useLanguage } from "@/contexts/LanguageContext";
 import Layout from "@/components/layout/Layout";
 import DispatchModal from "@/components/DispatchModal";
+import RehabCaseModal, { RehabCaseData } from "@/components/RehabCaseModal";
+import AidDistributionModal, { AidLogData } from "@/components/AidDistributionModal";
 import {
   AlertTriangle,
   CheckCircle,
@@ -19,6 +21,10 @@ import {
   X,
   Truck,
   Play,
+  Hammer,
+  Package,
+  Plus,
+  ArrowRight,
 } from "lucide-react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -43,7 +49,49 @@ interface Report {
   dispatchNote?: string | null;
 }
 
-type AdminTab = "map" | "feed" | "gallery";
+type AdminTab = "map" | "feed" | "gallery" | "rehab";
+
+interface RehabCase {
+  id: string;
+  damage_report_id: string;
+  needs: string[];
+  priority: "low" | "medium" | "high";
+  assigned_org: string | null;
+  target_date: string | null;
+  notes: string | null;
+  status: "open" | "in_progress" | "completed";
+  location: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  created_at: string;
+  damage_report_title?: string;
+}
+
+interface AidLog {
+  id: string;
+  rehab_case_id: string | null;
+  item_type: string;
+  quantity: number;
+  unit: string;
+  delivered_by: string;
+  delivered_to: string;
+  location: string | null;
+  ward: string | null;
+  proof_image_url: string | null;
+  notes: string | null;
+  delivered_at: string;
+}
+
+// Need labels for display
+const NEED_LABELS: { [key: string]: { en: string; np: string } } = {
+  temp_shelter: { en: "Temporary Shelter", np: "अस्थायी आश्रय" },
+  food_support: { en: "Food Support", np: "खाद्य सहायता" },
+  medical_followup: { en: "Medical Follow-up", np: "चिकित्सा अनुगमन" },
+  psychosocial: { en: "Psychosocial Support", np: "मनोसामाजिक सहायता" },
+  house_repair: { en: "House Repair", np: "घर मर्मत" },
+  school_restoration: { en: "School Restoration", np: "विद्यालय पुनर्निर्माण" },
+  road_repair: { en: "Road/Bridge Repair", np: "सडक/पुल मर्मत" },
+};
 
 // Team name mapping for display
 const getTeamDisplayName = (teamId: string, t: (key: string) => string): string => {
@@ -86,6 +134,14 @@ const AdminDashboard = () => {
   const [dispatchModalOpen, setDispatchModalOpen] = useState(false);
   const [selectedReportForDispatch, setSelectedReportForDispatch] = useState<Report | null>(null);
 
+  // Rehab module state
+  const [rehabCases, setRehabCases] = useState<RehabCase[]>([]);
+  const [aidLogs, setAidLogs] = useState<AidLog[]>([]);
+  const [rehabModalOpen, setRehabModalOpen] = useState(false);
+  const [selectedReportForRehab, setSelectedReportForRehab] = useState<Report | null>(null);
+  const [aidModalOpen, setAidModalOpen] = useState(false);
+  const [selectedRehabForAid, setSelectedRehabForAid] = useState<string | undefined>(undefined);
+
   useEffect(() => {
     if (!authLoading && !session) {
       navigate("/auth");
@@ -95,6 +151,8 @@ const AdminDashboard = () => {
   useEffect(() => {
     if (session) {
       fetchAllReports();
+      fetchRehabCases();
+      fetchAidLogs();
     }
   }, [session]);
 
@@ -311,6 +369,58 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchRehabCases = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("rehab_cases")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching rehab cases:", error);
+        return;
+      }
+
+      // Get damage report titles for each rehab case
+      const casesWithTitles = await Promise.all(
+        (data || []).map(async (rehabCase: any) => {
+          const { data: damageReport } = await supabase
+            .from("damage_reports")
+            .select("location")
+            .eq("id", rehabCase.damage_report_id)
+            .single();
+
+          return {
+            ...rehabCase,
+            damage_report_title: damageReport?.location || "Unknown",
+          };
+        })
+      );
+
+      setRehabCases(casesWithTitles);
+    } catch (error) {
+      console.error("Error fetching rehab cases:", error);
+    }
+  };
+
+  const fetchAidLogs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("aid_distribution_logs")
+        .select("*")
+        .order("delivered_at", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching aid logs:", error);
+        return;
+      }
+
+      setAidLogs(data || []);
+    } catch (error) {
+      console.error("Error fetching aid logs:", error);
+    }
+  };
+
   const handleDispatchClick = (report: Report) => {
     setSelectedReportForDispatch(report);
     setDispatchModalOpen(true);
@@ -408,6 +518,99 @@ const AdminDashboard = () => {
         verifiedCount: prev.verifiedCount + 1,
       }));
 
+    } catch (error: any) {
+      toast({ title: t("error"), description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleConvertToRehab = (report: Report) => {
+    setSelectedReportForRehab(report);
+    setRehabModalOpen(true);
+  };
+
+  const handleSaveRehabCase = async (data: RehabCaseData) => {
+    try {
+      const { error } = await supabase.from("rehab_cases").insert({
+        damage_report_id: data.damage_report_id,
+        needs: data.needs,
+        priority: data.priority,
+        assigned_org: data.assigned_org || null,
+        target_date: data.target_date || null,
+        notes: data.notes || null,
+        location: data.location || null,
+        latitude: data.latitude || null,
+        longitude: data.longitude || null,
+        status: "open",
+      });
+
+      if (error) throw error;
+
+      toast({ title: t("rehabCreatedSuccess") });
+      fetchRehabCases();
+    } catch (error: any) {
+      toast({ title: t("error"), description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleUpdateRehabStatus = async (rehabId: string, newStatus: "open" | "in_progress" | "completed") => {
+    try {
+      const { error } = await supabase
+        .from("rehab_cases")
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq("id", rehabId);
+
+      if (error) throw error;
+
+      toast({ title: t("rehabUpdatedSuccess") });
+      setRehabCases((prev) =>
+        prev.map((rc) => (rc.id === rehabId ? { ...rc, status: newStatus } : rc))
+      );
+    } catch (error: any) {
+      toast({ title: t("error"), description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleSaveAidLog = async (data: AidLogData) => {
+    try {
+      let proofImageUrl: string | null = null;
+
+      // Upload proof image if provided
+      if (data.proof_image_file) {
+        const fileExt = data.proof_image_file.name.split(".").pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `aid-proofs/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("evidence")
+          .upload(filePath, data.proof_image_file);
+
+        if (uploadError) {
+          console.error("Upload error:", uploadError);
+        } else {
+          const { data: urlData } = supabase.storage
+            .from("evidence")
+            .getPublicUrl(filePath);
+          proofImageUrl = urlData.publicUrl;
+        }
+      }
+
+      const { error } = await supabase.from("aid_distribution_logs").insert({
+        rehab_case_id: data.rehab_case_id || null,
+        item_type: data.item_type,
+        quantity: data.quantity,
+        unit: data.unit,
+        delivered_by: data.delivered_by,
+        delivered_to: data.delivered_to,
+        location: data.location || null,
+        ward: data.ward || null,
+        proof_image_url: proofImageUrl,
+        notes: data.notes || null,
+      });
+
+      if (error) throw error;
+
+      toast({ title: t("aidLogSuccess") });
+      fetchAidLogs();
     } catch (error: any) {
       toast({ title: t("error"), description: error.message, variant: "destructive" });
     }
@@ -699,6 +902,17 @@ const AdminDashboard = () => {
             <ImageIcon className="w-4 h-4" />
             {t("gallery")} ({photos.length})
           </button>
+          <button
+            onClick={() => setActiveTab("rehab")}
+            className={`flex-1 lg:flex-none lg:px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 ${
+              activeTab === "rehab"
+                ? "text-[#0D6A6A] border-b-2 border-[#0D6A6A]"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            <Hammer className="w-4 h-4" />
+            {t("rehabilitation")} ({rehabCases.length})
+          </button>
         </div>
       </div>
 
@@ -903,6 +1117,19 @@ const AdminDashboard = () => {
                           {t("viewOnMap")}
                         </Button>
                       )}
+
+                      {/* Convert to Rehab - only for resolved damage reports */}
+                      {report.status === "resolved" && report.type === "damage" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleConvertToRehab(report)}
+                          className="text-xs text-orange-600 border-orange-600 hover:bg-orange-50"
+                        >
+                          <Hammer className="w-3 h-3 mr-1" />
+                          {t("convertToRehab")}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))
@@ -939,6 +1166,256 @@ const AdminDashboard = () => {
                         }}
                       />
                     </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Rehabilitation Tab */}
+        {activeTab === "rehab" && (
+          <div className="h-full overflow-y-auto bg-[#F9FAFA] relative z-20">
+            <div className="max-w-6xl mx-auto p-4 sm:p-6">
+              {/* Rehab Stats */}
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                      <Clock className="w-5 h-5 text-yellow-600" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-slate-dark">
+                        {rehabCases.filter((r) => r.status === "open").length}
+                      </p>
+                      <p className="text-sm text-slate-gray">{t("rehabOpen")}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <Hammer className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-blue-600">
+                        {rehabCases.filter((r) => r.status === "in_progress").length}
+                      </p>
+                      <p className="text-sm text-slate-gray">{t("rehabInProgress")}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                      <CheckCircle className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-green-600">
+                        {rehabCases.filter((r) => r.status === "completed").length}
+                      </p>
+                      <p className="text-sm text-slate-gray">{t("rehabCompleted")}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Aid Distribution Section */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <Package className="w-5 h-5 text-[#0D6A6A]" />
+                    <h3 className="font-semibold text-slate-dark">{t("aidDistribution")}</h3>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setSelectedRehabForAid(undefined);
+                      setAidModalOpen(true);
+                    }}
+                    className="bg-[#0D6A6A] hover:bg-[#0a5555] text-white"
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    {t("addAidLog")}
+                  </Button>
+                </div>
+
+                {aidLogs.length === 0 ? (
+                  <p className="text-sm text-slate-gray text-center py-4">{t("noAidLogs")}</p>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {aidLogs.slice(0, 5).map((log) => (
+                      <div
+                        key={log.id}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-[#0D6A6A]/10 rounded-lg flex items-center justify-center">
+                            <Package className="w-4 h-4 text-[#0D6A6A]" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-slate-dark text-sm">
+                              {log.quantity} {log.unit} {log.item_type}
+                            </p>
+                            <p className="text-xs text-slate-gray">
+                              {log.delivered_by} → {log.delivered_to}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-slate-gray">
+                            {new Date(log.delivered_at).toLocaleDateString()}
+                          </p>
+                          {log.location && (
+                            <p className="text-xs text-slate-gray">{log.location}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {aidLogs.length > 5 && (
+                  <p className="text-sm text-[#0D6A6A] text-center mt-3 cursor-pointer hover:underline">
+                    {t("totalAidItems")}: {aidLogs.length}
+                  </p>
+                )}
+              </div>
+
+              {/* Rehab Cases List */}
+              <h3 className="font-semibold text-slate-dark mb-4 flex items-center gap-2">
+                <Hammer className="w-5 h-5" />
+                {t("rehabCases")}
+              </h3>
+
+              {rehabCases.length === 0 ? (
+                <div className="text-center py-12 bg-white rounded-lg shadow-sm">
+                  <Hammer className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-slate-gray">{t("noRehabCases")}</p>
+                  <p className="text-sm text-gray-400 mt-2">
+                    Convert resolved damage reports to create rehab cases
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {rehabCases.map((rehabCase) => (
+                    <div
+                      key={rehabCase.id}
+                      className={`bg-white rounded-lg shadow-sm p-4 border-l-4 ${
+                        rehabCase.status === "completed"
+                          ? "border-l-green-500"
+                          : rehabCase.status === "in_progress"
+                          ? "border-l-blue-500"
+                          : rehabCase.priority === "high"
+                          ? "border-l-red-500"
+                          : rehabCase.priority === "medium"
+                          ? "border-l-yellow-500"
+                          : "border-l-gray-300"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <p className="font-semibold text-slate-dark">
+                            {rehabCase.location || rehabCase.damage_report_title}
+                          </p>
+                          <p className="text-xs text-slate-gray mt-1">
+                            {t("linkedDamageReport")}: {rehabCase.damage_report_title}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-xs px-2 py-1 rounded font-medium ${
+                              rehabCase.priority === "high"
+                                ? "bg-red-100 text-red-700"
+                                : rehabCase.priority === "medium"
+                                ? "bg-yellow-100 text-yellow-700"
+                                : "bg-gray-100 text-gray-600"
+                            }`}
+                          >
+                            {t(`priority${rehabCase.priority.charAt(0).toUpperCase() + rehabCase.priority.slice(1)}`)}
+                          </span>
+                          <span
+                            className={`text-xs px-2 py-1 rounded font-medium ${
+                              rehabCase.status === "completed"
+                                ? "bg-green-100 text-green-700"
+                                : rehabCase.status === "in_progress"
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-yellow-100 text-yellow-700"
+                            }`}
+                          >
+                            {rehabCase.status === "completed"
+                              ? t("rehabCompleted")
+                              : rehabCase.status === "in_progress"
+                              ? t("rehabInProgress")
+                              : t("rehabOpen")}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Needs Tags */}
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {rehabCase.needs.map((need) => (
+                          <span
+                            key={need}
+                            className="text-xs bg-[#0D6A6A]/10 text-[#0D6A6A] px-2 py-1 rounded"
+                          >
+                            {NEED_LABELS[need]?.en || need}
+                          </span>
+                        ))}
+                      </div>
+
+                      {/* Details */}
+                      <div className="flex flex-wrap gap-4 text-sm text-slate-gray mb-3">
+                        {rehabCase.assigned_org && (
+                          <span>📋 {rehabCase.assigned_org}</span>
+                        )}
+                        {rehabCase.target_date && (
+                          <span>📅 {new Date(rehabCase.target_date).toLocaleDateString()}</span>
+                        )}
+                      </div>
+
+                      {rehabCase.notes && (
+                        <p className="text-sm text-slate-gray bg-gray-50 p-2 rounded mb-3">
+                          {rehabCase.notes}
+                        </p>
+                      )}
+
+                      {/* Actions */}
+                      <div className="flex flex-wrap gap-2">
+                        {rehabCase.status === "open" && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleUpdateRehabStatus(rehabCase.id, "in_progress")}
+                            className="bg-blue-600 hover:bg-blue-700 text-white text-xs"
+                          >
+                            <ArrowRight className="w-3 h-3 mr-1" />
+                            {t("rehabInProgress")}
+                          </Button>
+                        )}
+                        {rehabCase.status === "in_progress" && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleUpdateRehabStatus(rehabCase.id, "completed")}
+                            className="bg-green-600 hover:bg-green-700 text-white text-xs"
+                          >
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            {t("rehabCompleted")}
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedRehabForAid(rehabCase.id);
+                            setAidModalOpen(true);
+                          }}
+                          className="text-xs"
+                        >
+                          <Package className="w-3 h-3 mr-1" />
+                          {t("addAidLog")}
+                        </Button>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
@@ -1003,6 +1480,32 @@ const AdminDashboard = () => {
         }}
         onDispatch={handleDispatch}
         reportTitle={selectedReportForDispatch?.title || ""}
+      />
+
+      {/* Rehab Case Modal */}
+      <RehabCaseModal
+        isOpen={rehabModalOpen}
+        onClose={() => {
+          setRehabModalOpen(false);
+          setSelectedReportForRehab(null);
+        }}
+        onSave={handleSaveRehabCase}
+        damageReportId={selectedReportForRehab?.id || ""}
+        damageReportTitle={selectedReportForRehab?.title || ""}
+        initialLocation={selectedReportForRehab?.description}
+        initialLatitude={selectedReportForRehab?.latitude}
+        initialLongitude={selectedReportForRehab?.longitude}
+      />
+
+      {/* Aid Distribution Modal */}
+      <AidDistributionModal
+        isOpen={aidModalOpen}
+        onClose={() => {
+          setAidModalOpen(false);
+          setSelectedRehabForAid(undefined);
+        }}
+        onSave={handleSaveAidLog}
+        rehabCaseId={selectedRehabForAid}
       />
     </Layout>
   );
